@@ -94,7 +94,11 @@ defmodule Spark.Dsl.Fragment do
       end
 
       def validate_sections do
-        List.wrap(@validate_sections)
+        if function_exported?(__MODULE__, :__spark_validate_sections__, 0) do
+          __MODULE__.__spark_validate_sections__()
+        else
+          []
+        end
       end
 
       @persisted @spark_dsl_config[:persist]

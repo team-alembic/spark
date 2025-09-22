@@ -452,7 +452,6 @@ defmodule Spark.Dsl.Extension do
     body =
       quote generated: true, location: :keep do
         Module.register_attribute(__MODULE__, :extensions, persist: true)
-        Module.register_attribute(__MODULE__, :validate_sections, persist: true, accumulate: true)
         @extensions unquote(extensions)
         @persist {:spark_extensions, @extensions}
       end
@@ -594,8 +593,7 @@ defmodule Spark.Dsl.Extension do
         |> Enum.into(%{})
 
       validate_sections =
-        Module.get_attribute(__MODULE__, :validate_sections)
-        |> List.wrap()
+        Process.get({__MODULE__, :validate_sections_temp}, [])
         |> Enum.concat(Enum.flat_map(fragments || [], & &1.validate_sections()))
         |> Enum.uniq_by(&elem(&1, 0))
 
@@ -637,6 +635,9 @@ defmodule Spark.Dsl.Extension do
           Process.delete(key)
         end
       end
+
+      # Generate __spark_validate_sections__/0 function with the collected data
+      def __spark_validate_sections__(), do: unquote(Macro.escape(validate_sections))
 
       transformers_to_run =
         if transform? do
@@ -921,8 +922,10 @@ defmodule Spark.Dsl.Extension do
                     ])
                   end
 
-                  @validate_sections {unquote(section_path), unquote(__MODULE__),
-                                      unquote(extension)}
+                  # Store validation section data in process dictionary
+                  validate_section_data = {unquote(section_path), unquote(__MODULE__), unquote(extension)}
+                  current_validate_sections = Process.get({__MODULE__, :validate_sections_temp}, [])
+                  Process.put({__MODULE__, :validate_sections_temp}, [validate_section_data | current_validate_sections])
                 end
               ]
 
